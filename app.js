@@ -35,8 +35,12 @@ form.addEventListener("submit", (event) => {
     const distance = distanceSelect.value;
     const raceDate = raceDateInput.value;
 
-    if (!raceDate){
-        planOutput.textContent=(`Please choose race date.`)
+    if (distance === "Choose" && !raceDate){
+        planOutput.textContent=(`Please choose a distance and a race date.`)
+    } else if(distance === "Choose") {
+        planOutput.textContent = "Please choose a race distance.";
+    } else if(!raceDate){
+        planOutput.textContent = "Please choose a race date."        
     } else {
         planOutput.textContent=(``);
         let outputHeader = document.createElement("h2");
@@ -48,14 +52,21 @@ form.addEventListener("submit", (event) => {
 
         let runPlanContainer = document.createElement("div")
         planOutput.appendChild(runPlanContainer);
+        runPlanContainer.classList.add("run-list"); 
 
         for (let run of week1Plan){
             let runContainer = document.createElement("div")
+            runContainer.classList.add("run-item");
             runPlanContainer.appendChild(runContainer);
+            
             let runElement = document.createElement("p");
             runContainer.appendChild(runElement);
-            
+
             runElement.textContent=(`Run type: ${run.runType}, Run distance: ${run.distanceKm}`)
+            let feelingLabel = document.createElement("label");
+            feelingLabel.textContent = "How are you feeling today?";
+            runContainer.appendChild(feelingLabel);
+
             let feelingTodaySelector = document.createElement("select");
             runContainer.appendChild(feelingTodaySelector);
             
@@ -91,7 +102,8 @@ form.addEventListener("submit", (event) => {
 
             if (savedFeeling === "not_great"){
                 const adjustedLabel = document.createElement("span");
-                adjustedLabel.textContent = ("Adjusted")
+                adjustedLabel.classList.add("adjusted-badge");
+                adjustedLabel.textContent = ("Adjusted");
                 runContainer.appendChild(adjustedLabel);
             }
 
