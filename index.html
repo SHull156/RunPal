@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunPal</title>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>RunPal</h1>
+            <button id="reset-button" type="button">Reset Plan</button>
+        </header>
+
+        <form id="plan-form">
+            <label for="distance">Choose distance:</label>
+            <select name="distance" id="distance">
+                <option value="5km">5km</option>
+                <option value="10km">10km</option>
+                <option value="15km">15km</option>
+                <option value="20km">20km</option>
+            </select>
+
+            <label for="race-date">Choose race date:</label>
+            <input type="date" id="race-date" name="raceDate">
+
+
+            <button id="generate-button" type="submit">Generate plan</button>
+        </form>
+
+        <section id="plan-output"></section>
+
+    </main>
+
+    <script src="app.js"></script>
+    
+</body>
+</html>
