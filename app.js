@@ -28,29 +28,80 @@ const week1Plan = [
 
 ]
 
+const wellnessStore = {};
+
 form.addEventListener("submit", (event) => {
     event.preventDefault()
     const distance = distanceSelect.value;
     const raceDate = raceDateInput.value;
 
     if (!raceDate){
-        planOutput.innerHTML=(`Please choose race date.`)
+        planOutput.textContent=(`Please choose race date.`)
     } else {
-        planOutput.innerHTML=(``);
+        planOutput.textContent=(``);
         let outputHeader = document.createElement("h2");
         planOutput.appendChild(outputHeader);
-        outputHeader.innerHTML=(`Plan for ${distance} race on ${raceDate}`)
+        outputHeader.textContent=(`Plan for ${distance} race on ${raceDate}`)
         let weekHeader = document.createElement("h3");
         planOutput.appendChild(weekHeader);
-        weekHeader.innerHTML=("Week 1")
+        weekHeader.textContent=("Week 1")
 
         let runPlanContainer = document.createElement("div")
         planOutput.appendChild(runPlanContainer);
 
         for (let run of week1Plan){
+            let runContainer = document.createElement("div")
+            runPlanContainer.appendChild(runContainer);
             let runElement = document.createElement("p");
-            runPlanContainer.appendChild(runElement);
-            runElement.innerHTML=(`Run type: ${run.runType}, Run distance: ${run.distanceKm}`)
+            runContainer.appendChild(runElement);
+            
+            runElement.textContent=(`Run type: ${run.runType}, Run distance: ${run.distanceKm}`)
+            let feelingTodaySelector = document.createElement("select");
+            runContainer.appendChild(feelingTodaySelector);
+            
+            //choose feeling option
+            let chooseFeeling = document.createElement("option");
+            chooseFeeling.textContent = ("Please choose");
+            chooseFeeling.value = "";
+            feelingTodaySelector.appendChild(chooseFeeling);
+            
+            
+            //feeling good option
+            let feelingGood = document.createElement("option");
+            feelingGood.textContent = ("Good");
+            feelingGood.value = "good";
+            feelingTodaySelector.appendChild(feelingGood);
+            
+            //feeling ok option
+            let feelingOK = document.createElement("option");
+            feelingOK.textContent =("OK");
+            feelingOK.value = "ok";
+            feelingTodaySelector.appendChild(feelingOK);
+            ;
+            
+            //feeling not great option
+            let feelingNotGreat = document.createElement("option");
+            feelingNotGreat.textContent = ("Not great")
+            feelingNotGreat.value = "not_great"
+            feelingTodaySelector.appendChild(feelingNotGreat);
+
+            //restore saved value
+            const savedFeeling = wellnessStore[run.id];
+            feelingTodaySelector.value = savedFeeling ? savedFeeling : "";
+
+            //store on change
+            feelingTodaySelector.addEventListener("change", () => {
+                const selectedFeeling = feelingTodaySelector.value; 
+
+                if (selectedFeeling === "") {
+                    delete wellnessStore[run.id];
+                } else {
+                    wellnessStore[run.id] = selectedFeeling;
+                }
+            });
+
+            
+
         }
         
     }
