@@ -89,6 +89,12 @@ form.addEventListener("submit", (event) => {
             const savedFeeling = wellnessStore[run.id];
             feelingTodaySelector.value = savedFeeling ? savedFeeling : "";
 
+            if (savedFeeling === "not_great"){
+                const adjustedLabel = document.createElement("span");
+                adjustedLabel.textContent = ("Adjusted")
+                runContainer.appendChild(adjustedLabel);
+            }
+
             //store on change
             feelingTodaySelector.addEventListener("change", () => {
                 const selectedFeeling = feelingTodaySelector.value; 
