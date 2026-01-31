@@ -1,5 +1,6 @@
 const form = document.getElementById("plan-form"); 
 const distanceSelect = document.getElementById("distance"); 
+const runsPerWeekSelect = document.getElementById("runs-per-week");
 const raceDateInput = document.getElementById("race-date"); 
 const planOutput = document.getElementById("plan-output"); 
 const resetButton = document.getElementById("reset-button");
@@ -33,100 +34,113 @@ const wellnessStore = {};
 form.addEventListener("submit", (event) => {
     event.preventDefault()
     const distance = distanceSelect.value;
+    const runsPerWeek = runsPerWeekSelect.value;
     const raceDate = raceDateInput.value;
-
-    if (distance === "Choose" && !raceDate){
-        planOutput.textContent=(`Please choose a distance and a race date.`)
-    } else if(distance === "Choose") {
-        planOutput.textContent = "Please choose a race distance.";
-    } else if(!raceDate){
-        planOutput.textContent = "Please choose a race date."        
-    } else {
-        planOutput.textContent=(``);
-        let outputHeader = document.createElement("h2");
-        planOutput.appendChild(outputHeader);
-        outputHeader.textContent=(`Plan for ${distance} race on ${raceDate}`)
-        let weekHeader = document.createElement("h3");
-        planOutput.appendChild(weekHeader);
-        weekHeader.textContent=("Week 1")
-
-        let runPlanContainer = document.createElement("div")
-        planOutput.appendChild(runPlanContainer);
-        runPlanContainer.classList.add("run-list"); 
-
-        for (let run of week1Plan){
-            let runContainer = document.createElement("div")
-            runContainer.classList.add("run-item");
-            runPlanContainer.appendChild(runContainer);
-            
-            let runElement = document.createElement("p");
-            runContainer.appendChild(runElement);
-
-            runElement.textContent=(`Run type: ${run.runType}, Run distance: ${run.distanceKm}`)
-            let feelingLabel = document.createElement("label");
-            feelingLabel.textContent = "How are you feeling today?";
-            runContainer.appendChild(feelingLabel);
-
-            let feelingTodaySelector = document.createElement("select");
-            runContainer.appendChild(feelingTodaySelector);
-            
-            //choose feeling option
-            let chooseFeeling = document.createElement("option");
-            chooseFeeling.textContent = ("Please choose");
-            chooseFeeling.value = "";
-            feelingTodaySelector.appendChild(chooseFeeling);
-            
-            
-            //feeling good option
-            let feelingGood = document.createElement("option");
-            feelingGood.textContent = ("Good");
-            feelingGood.value = "good";
-            feelingTodaySelector.appendChild(feelingGood);
-            
-            //feeling ok option
-            let feelingOK = document.createElement("option");
-            feelingOK.textContent =("OK");
-            feelingOK.value = "ok";
-            feelingTodaySelector.appendChild(feelingOK);
-            ;
-            
-            //feeling not great option
-            let feelingNotGreat = document.createElement("option");
-            feelingNotGreat.textContent = ("Not great")
-            feelingNotGreat.value = "not_great"
-            feelingTodaySelector.appendChild(feelingNotGreat);
-
-            //restore saved value
-            const savedFeeling = wellnessStore[run.id];
-            feelingTodaySelector.value = savedFeeling ? savedFeeling : "";
-
-            if (savedFeeling === "not_great"){
-                const adjustedLabel = document.createElement("span");
-                adjustedLabel.classList.add("adjusted-badge");
-                adjustedLabel.textContent = ("Adjusted");
-                runContainer.appendChild(adjustedLabel);
-            }
-
-            //store on change
-            feelingTodaySelector.addEventListener("change", () => {
-                const selectedFeeling = feelingTodaySelector.value; 
-
-                if (selectedFeeling === "") {
-                    delete wellnessStore[run.id];
-                } else {
-                    wellnessStore[run.id] = selectedFeeling;
-                }
-            });
-
-            
-
-        }
-        
-    }
     
-})
+    let missingInputs = [];
 
+    // Build missing inputs list
+    if (distance === "") missingInputs.push("distance");
+    if (runsPerWeek === "") missingInputs.push("runs per week");
+    if (!raceDate) missingInputs.push("race date");
 
+    // If anything missing, show message and stop
+    if (missingInputs.length > 0) {
+        let message;
 
+        if (missingInputs.length === 1) {
+        message = missingInputs[0];
+        } else if (missingInputs.length === 2) {
+        message = missingInputs.join(" and ");
+        } else {
+        message =
+            missingInputs.slice(0, -1).join(", ") +
+            " and " +
+            missingInputs[missingInputs.length - 1];
+        }
 
+        planOutput.textContent = `Please choose ${message}.`;
+        return;
+    }
 
+    // Clear previous output
+     planOutput.textContent = "";
+
+    
+    // Header
+    const outputHeader = document.createElement("h2");
+    outputHeader.textContent = `Plan for ${distance} race on ${raceDate}`;
+    planOutput.appendChild(outputHeader);
+
+    // Week header
+    const weekHeader = document.createElement("h3");
+    weekHeader.textContent = "Week 1";
+    planOutput.appendChild(weekHeader);
+
+    // Run list container
+    const runPlanContainer = document.createElement("div");
+    runPlanContainer.classList.add("run-list");
+    planOutput.appendChild(runPlanContainer);
+
+    // Render runs
+    for (const run of week1Plan) {
+        const runContainer = document.createElement("div");
+        runContainer.classList.add("run-item");
+        runPlanContainer.appendChild(runContainer);
+
+        const runElement = document.createElement("p");
+        runElement.textContent = `Run type: ${run.runType}, Run distance: ${run.distanceKm}`;
+        runContainer.appendChild(runElement);
+
+        const feelingLabel = document.createElement("label");
+        feelingLabel.textContent = "How are you feeling today?";
+        runContainer.appendChild(feelingLabel);
+
+        const feelingTodaySelector = document.createElement("select");
+        runContainer.appendChild(feelingTodaySelector);
+
+        // Options
+        const chooseFeeling = document.createElement("option");
+        chooseFeeling.textContent = "Please choose";
+        chooseFeeling.value = "";
+        feelingTodaySelector.appendChild(chooseFeeling);
+
+        const feelingGood = document.createElement("option");
+        feelingGood.textContent = "Good";
+        feelingGood.value = "good";
+        feelingTodaySelector.appendChild(feelingGood);
+
+        const feelingOK = document.createElement("option");
+        feelingOK.textContent = "OK";
+        feelingOK.value = "ok";
+        feelingTodaySelector.appendChild(feelingOK);
+
+        const feelingNotGreat = document.createElement("option");
+        feelingNotGreat.textContent = "Not great";
+        feelingNotGreat.value = "not_great";
+        feelingTodaySelector.appendChild(feelingNotGreat);
+
+        // Restore saved value
+        const savedFeeling = wellnessStore[run.id];
+        feelingTodaySelector.value = savedFeeling ? savedFeeling : "";
+
+        // Badge if adjusted
+        if (savedFeeling === "not_great") {
+        const adjustedLabel = document.createElement("span");
+        adjustedLabel.classList.add("adjusted-badge");
+        adjustedLabel.textContent = "Adjusted";
+        runContainer.appendChild(adjustedLabel);
+        }
+
+        // Store on change
+        feelingTodaySelector.addEventListener("change", () => {
+        const selectedFeeling = feelingTodaySelector.value;
+
+        if (selectedFeeling === "") {
+            delete wellnessStore[run.id];
+        } else {
+            wellnessStore[run.id] = selectedFeeling;
+        }
+        });
+    }
+    });
