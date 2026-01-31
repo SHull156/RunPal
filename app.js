@@ -5,7 +5,7 @@ const raceDateInput = document.getElementById("race-date");
 const planOutput = document.getElementById("plan-output"); 
 const resetButton = document.getElementById("reset-button");
 
-const week1Plan = [
+const baseRuns = [
   { id: 1, weekNumber: 1, runType: "easy",  distanceKm: 5  },
   { id: 2, weekNumber: 1, runType: "tempo", distanceKm: 10 },
   { id: 3, weekNumber: 1, runType: "long",  distanceKm: 15 }
@@ -49,6 +49,9 @@ form.addEventListener("submit", (event) => {
     // Clear previous output
     planOutput.textContent = "";
 
+    //convert runs per week to number
+    const runsPerWeekNum = Number(runsPerWeekSelect.value);
+
     //Work out difference between current and race date
     const today = new Date();
     const race = new Date(raceDate);
@@ -82,8 +85,17 @@ form.addEventListener("submit", (event) => {
         runPlanContainer.classList.add("run-list");
         planOutput.appendChild(runPlanContainer);
 
+        const runsForThisWeek = [];
+        for (const run of baseRuns){
+           if(runsForThisWeek.length === runsPerWeekNum){
+            break;
+           }
+           runsForThisWeek.push(run);
+
+        }
+
         // Render runs
-        for (const run of week1Plan) {
+        for (const run of runsForThisWeek) {
             const runContainer = document.createElement("div");
             runContainer.classList.add("run-item");
             runPlanContainer.appendChild(runContainer);
