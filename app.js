@@ -22,6 +22,18 @@ const loadPlanFromLocalStorage = () => {
   }
 };
 
+const updateSavedWellnessStore = (nextWellnessStore) => {
+  const savedPlan = loadPlanFromLocalStorage();
+  if (!savedPlan) return; // no saved plan yet so nothing to update
+
+  const updatedPlan = {
+    ...savedPlan,
+    wellnessStore: { ...nextWellnessStore },
+  };
+
+  savePlanToLocalStorage(updatedPlan);
+};
+
 const baseRuns = [
   { id: 1, runType: "Easy run", distanceKm: 5, bucket: "recovery" },
   { id: 2, runType: "Easy run", distanceKm: 6, bucket: "recovery" },
@@ -77,12 +89,7 @@ const selectRunsForWeek = (runs, runsPerWeekNum) => {
   return pickRandomUnique(selected, selected.length);
 };
 
-const renderPlan = ({
-  distance,
-  raceDate,
-  weeksToGenerate,
-  selectedRunIdsByWeek,
-}) => {
+const renderPlan = ({ distance, raceDate, weeksToGenerate, selectedRunIdsByWeek }) => {
   // Clear previous output
   planOutput.textContent = "";
 
@@ -160,7 +167,7 @@ const renderPlan = ({
         runContainer.appendChild(adjustedLabel);
       }
 
-      // Store on change (in-memory for now)
+      // Store on change (in-memory + persist)
       feelingTodaySelector.addEventListener("change", () => {
         const selectedFeeling = feelingTodaySelector.value;
 
@@ -169,6 +176,8 @@ const renderPlan = ({
         } else {
           wellnessStore[runKey] = selectedFeeling;
         }
+
+        updateSavedWellnessStore(wellnessStore);
       });
     }
   }
@@ -250,6 +259,11 @@ form.addEventListener("submit", (event) => {
     selectedRunIdsByWeek.push(runsForThisWeek.map((run) => run.id));
   }
 
+  // New plan = new slate for wellness
+  for (const key of Object.keys(wellnessStore)) {
+    delete wellnessStore[key];
+  }
+
   // Render from data
   renderPlan({
     distance,
@@ -258,7 +272,7 @@ form.addEventListener("submit", (event) => {
     selectedRunIdsByWeek,
   });
 
-  // Save snapshot (Commit 1 behaviour)
+  // Save snapshot
   const planData = {
     version: 1,
     distance,
@@ -272,7 +286,7 @@ form.addEventListener("submit", (event) => {
   savePlanToLocalStorage(planData);
 });
 
-// Restore on page load (Commit 2 behaviour)
+// Restore on page load
 const savedPlan = loadPlanFromLocalStorage();
 
 if (savedPlan) {
