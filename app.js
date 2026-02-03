@@ -24,15 +24,54 @@ const loadPlanFromLocalStorage = () => {
 
 const updateSavedWellnessStore = (nextWellnessStore) => {
   const savedPlan = loadPlanFromLocalStorage();
-  if (!savedPlan) return; // no saved plan yet so nothing to update
+  if (!savedPlan) return;
 
-  const updatedPlan = {
+  savePlanToLocalStorage({
     ...savedPlan,
     wellnessStore: { ...nextWellnessStore },
-  };
-
-  savePlanToLocalStorage(updatedPlan);
+  });
 };
+
+// ---------- Wellness adjustment helpers ----------
+
+const roundTo1Decimal = (num) => Math.round(num * 10) / 10;
+
+const getAdjustedRunDisplay = (run, wellnessValue) => {
+  if (wellnessValue !== "not_great") {
+    return {
+      displayType: run.runType,
+      displayDistanceKm: run.distanceKm,
+      isAdjusted: false,
+    };
+  }
+
+  // Speed > downgrade to recovery, -20%
+  if (run.bucket === "speed") {
+    return {
+      displayType: "Recovery run",
+      displayDistanceKm: roundTo1Decimal(run.distanceKm * 0.8),
+      isAdjusted: true,
+    };
+  }
+
+  // Endurance > -20%
+  if (run.bucket === "endurance") {
+    return {
+      displayType: run.runType,
+      displayDistanceKm: roundTo1Decimal(run.distanceKm * 0.8),
+      isAdjusted: true,
+    };
+  }
+
+  // Recovery > -10%
+  return {
+    displayType: run.runType,
+    displayDistanceKm: roundTo1Decimal(run.distanceKm * 0.9),
+    isAdjusted: true,
+  };
+};
+
+// ---------- Base data ----------
 
 const baseRuns = [
   { id: 1, runType: "Easy run", distanceKm: 5, bucket: "recovery" },
@@ -45,15 +84,15 @@ const baseRuns = [
 
 const wellnessStore = {};
 
+// ---------- Plan generation helpers ----------
+
 const pickRandomUnique = (array, numberToPick) => {
-  let availableItems = [...array];
-
-  for (let i = availableItems.length - 1; i > 0; i--) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [availableItems[i], availableItems[j]] = [availableItems[j], availableItems[i]];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-
-  return availableItems.slice(0, numberToPick);
+  return copy.slice(0, numberToPick);
 };
 
 const getBucketCounts = (runsPerWeekNum) => {
@@ -61,144 +100,119 @@ const getBucketCounts = (runsPerWeekNum) => {
   if (runsPerWeekNum === 4) return { recovery: 1, speed: 2, endurance: 1 };
   if (runsPerWeekNum === 3) return { recovery: 1, speed: 1, endurance: 1 };
   if (runsPerWeekNum === 2) return { speed: 1, endurance: 1 };
-  return null; // 1 run/week handled separately
+  return null;
 };
 
 const selectRunsForWeek = (runs, runsPerWeekNum) => {
-  // 1 run → randomly selected run (any bucket)
-  if (runsPerWeekNum === 1) {
-    return pickRandomUnique(runs, 1);
-  }
+  if (runsPerWeekNum === 1) return pickRandomUnique(runs, 1);
 
   const counts = getBucketCounts(runsPerWeekNum);
   if (!counts) return [];
 
-  const runsByBucket = {
+  const byBucket = {
     recovery: runs.filter((r) => r.bucket === "recovery"),
     speed: runs.filter((r) => r.bucket === "speed"),
     endurance: runs.filter((r) => r.bucket === "endurance"),
   };
 
   const selected = [];
-
   for (const [bucket, count] of Object.entries(counts)) {
-    selected.push(...pickRandomUnique(runsByBucket[bucket], count));
+    selected.push(...pickRandomUnique(byBucket[bucket], count));
   }
 
-  // Shuffle final order so weeks don’t always list Recovery → Speed → Endurance
   return pickRandomUnique(selected, selected.length);
 };
 
+// ---------- Rendering ----------
+
 const renderPlan = ({ distance, raceDate, weeksToGenerate, selectedRunIdsByWeek }) => {
-  // Clear previous output
   planOutput.textContent = "";
 
-  // Header
   const outputHeader = document.createElement("h2");
   outputHeader.textContent = `Plan for ${distance} race on ${raceDate}`;
   planOutput.appendChild(outputHeader);
 
-  // Render weeks
   for (let weekNumber = 1; weekNumber <= weeksToGenerate; weekNumber++) {
-    // Week header
     const weekHeader = document.createElement("h3");
     weekHeader.textContent = `Week ${weekNumber}`;
     planOutput.appendChild(weekHeader);
 
-    // Run list container
     const runPlanContainer = document.createElement("div");
     runPlanContainer.classList.add("run-list");
     planOutput.appendChild(runPlanContainer);
 
-    const runIdsForThisWeek = selectedRunIdsByWeek[weekNumber - 1] || [];
-    const runsForThisWeek = runIdsForThisWeek
+    const runIds = selectedRunIdsByWeek[weekNumber - 1] || [];
+    const runsForThisWeek = runIds
       .map((id) => baseRuns.find((r) => r.id === id))
       .filter(Boolean);
 
-    // Render runs
     for (const run of runsForThisWeek) {
       const runContainer = document.createElement("div");
       runContainer.classList.add("run-item");
       runPlanContainer.appendChild(runContainer);
 
+      const runKey = `${weekNumber}-${run.id}`;
+      const savedFeeling = wellnessStore[runKey] || "";
+      const adjusted = getAdjustedRunDisplay(run, savedFeeling);
+
       const runElement = document.createElement("p");
-      runElement.textContent = `Run type: ${run.runType}, Run distance: ${run.distanceKm} km`;
+      runElement.textContent = `Run type: ${adjusted.displayType}, Run distance: ${adjusted.displayDistanceKm} km`;
       runContainer.appendChild(runElement);
 
-      const feelingLabel = document.createElement("label");
-      feelingLabel.textContent = "How are you feeling today?";
-      runContainer.appendChild(feelingLabel);
+      const label = document.createElement("label");
+      label.textContent = "How are you feeling today?";
+      runContainer.appendChild(label);
 
-      const feelingTodaySelector = document.createElement("select");
-      runContainer.appendChild(feelingTodaySelector);
+      const select = document.createElement("select");
+      runContainer.appendChild(select);
 
-      // Options
-      const chooseFeeling = document.createElement("option");
-      chooseFeeling.textContent = "Please choose";
-      chooseFeeling.value = "";
-      feelingTodaySelector.appendChild(chooseFeeling);
+      [
+        ["", "Please choose"],
+        ["good", "Good"],
+        ["ok", "OK"],
+        ["not_great", "Not great"],
+      ].forEach(([value, text]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        select.appendChild(option);
+      });
 
-      const feelingGood = document.createElement("option");
-      feelingGood.textContent = "Good";
-      feelingGood.value = "good";
-      feelingTodaySelector.appendChild(feelingGood);
+      select.value = savedFeeling;
 
-      const feelingOK = document.createElement("option");
-      feelingOK.textContent = "OK";
-      feelingOK.value = "ok";
-      feelingTodaySelector.appendChild(feelingOK);
+      const badge = document.createElement("span");
+      badge.classList.add("adjusted-badge");
+      badge.textContent = "Adjusted";
+      badge.style.display = adjusted.isAdjusted ? "inline-block" : "none";
+      runContainer.appendChild(badge);
 
-      const feelingNotGreat = document.createElement("option");
-      feelingNotGreat.textContent = "Not great";
-      feelingNotGreat.value = "not_great";
-      feelingTodaySelector.appendChild(feelingNotGreat);
-
-      const runKey = `${weekNumber}-${run.id}`;
-
-      // Restore saved value (from in-memory store)
-      const savedFeeling = wellnessStore[runKey];
-      feelingTodaySelector.value = savedFeeling ? savedFeeling : "";
-
-      // Badge if adjusted
-      if (savedFeeling === "not_great") {
-        const adjustedLabel = document.createElement("span");
-        adjustedLabel.classList.add("adjusted-badge");
-        adjustedLabel.textContent = "Adjusted";
-        runContainer.appendChild(adjustedLabel);
-      }
-
-      // Store on change (in-memory + persist)
-      feelingTodaySelector.addEventListener("change", () => {
-        const selectedFeeling = feelingTodaySelector.value;
-
-        if (selectedFeeling === "") {
+      select.addEventListener("change", () => {
+        if (select.value === "") {
           delete wellnessStore[runKey];
         } else {
-          wellnessStore[runKey] = selectedFeeling;
+          wellnessStore[runKey] = select.value;
         }
 
         updateSavedWellnessStore(wellnessStore);
+
+        const next = getAdjustedRunDisplay(run, wellnessStore[runKey]);
+        badge.style.display = next.isAdjusted ? "inline-block" : "none";
+        runElement.textContent = `Run type: ${next.displayType}, Run distance: ${next.displayDistanceKm} km`;
       });
     }
   }
 };
 
-// Reset Plan (UI + in-memory, and clears saved plan so refresh stays reset)
+// ---------- Reset ----------
+
 resetButton.addEventListener("click", () => {
-  // Clear UI
   planOutput.textContent = "";
-
-  // Reset form inputs
   form.reset();
-
-  // Clear wellness store
-  for (const key of Object.keys(wellnessStore)) {
-    delete wellnessStore[key];
-  }
-
-  // Clear saved plan
+  Object.keys(wellnessStore).forEach((k) => delete wellnessStore[k]);
   localStorage.removeItem(PLAN_STORAGE_KEY);
 });
+
+// ---------- Generate ----------
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -207,42 +221,15 @@ form.addEventListener("submit", (event) => {
   const runsPerWeek = runsPerWeekSelect.value;
   const raceDate = raceDateInput.value;
 
-  let missingInputs = [];
-
-  // Build missing inputs list
-  if (distance === "") missingInputs.push("distance");
-  if (runsPerWeek === "") missingInputs.push("runs per week");
-  if (!raceDate) missingInputs.push("race date");
-
-  // If anything missing, show message and stop
-  if (missingInputs.length > 0) {
-    let message;
-
-    if (missingInputs.length === 1) {
-      message = missingInputs[0];
-    } else if (missingInputs.length === 2) {
-      message = missingInputs.join(" and ");
-    } else {
-      message =
-        missingInputs.slice(0, -1).join(", ") +
-        " and " +
-        missingInputs[missingInputs.length - 1];
-    }
-
-    planOutput.textContent = `Please choose ${message}.`;
+  if (!distance || !runsPerWeek || !raceDate) {
+    planOutput.textContent = "Please choose distance, runs per week and race date.";
     return;
   }
 
-  // Convert runs per week to number
-  const runsPerWeekNum = Number(runsPerWeekSelect.value);
-
-  // Work out difference between current and race date
+  const runsPerWeekNum = Number(runsPerWeek);
   const today = new Date();
   const race = new Date(raceDate);
-
-  const msUntilRace = race - today;
-  const daysUntilRace = msUntilRace / (1000 * 60 * 60 * 24);
-  const weeksToRace = Math.ceil(daysUntilRace / 7);
+  const weeksToRace = Math.ceil((race - today) / (1000 * 60 * 60 * 24 * 7));
 
   if (weeksToRace <= 0) {
     planOutput.textContent = "Race date must be in the future.";
@@ -250,21 +237,16 @@ form.addEventListener("submit", (event) => {
   }
 
   const weeksToGenerate = Math.min(weeksToRace, 10);
-
-  // Generate selections (data) first
   const selectedRunIdsByWeek = [];
 
-  for (let weekNumber = 1; weekNumber <= weeksToGenerate; weekNumber++) {
-    const runsForThisWeek = selectRunsForWeek(baseRuns, runsPerWeekNum);
-    selectedRunIdsByWeek.push(runsForThisWeek.map((run) => run.id));
+  for (let i = 1; i <= weeksToGenerate; i++) {
+    selectedRunIdsByWeek.push(
+      selectRunsForWeek(baseRuns, runsPerWeekNum).map((r) => r.id)
+    );
   }
 
-  // New plan = new slate for wellness
-  for (const key of Object.keys(wellnessStore)) {
-    delete wellnessStore[key];
-  }
+  Object.keys(wellnessStore).forEach((k) => delete wellnessStore[k]);
 
-  // Render from data
   renderPlan({
     distance,
     raceDate,
@@ -272,41 +254,26 @@ form.addEventListener("submit", (event) => {
     selectedRunIdsByWeek,
   });
 
-  // Save snapshot
-  const planData = {
+  savePlanToLocalStorage({
     version: 1,
     distance,
     runsPerWeek: runsPerWeekNum,
     raceDate,
     weeksToGenerate,
     selectedRunIdsByWeek,
-    wellnessStore: { ...wellnessStore },
-  };
-
-  savePlanToLocalStorage(planData);
+    wellnessStore: {},
+  });
 });
 
-// Restore on page load
-const savedPlan = loadPlanFromLocalStorage();
+// ---------- Restore ----------
 
+const savedPlan = loadPlanFromLocalStorage();
 if (savedPlan) {
-  // Restore form inputs
   distanceSelect.value = savedPlan.distance || "";
-  runsPerWeekSelect.value =
-    typeof savedPlan.runsPerWeek === "number" ? String(savedPlan.runsPerWeek) : "";
+  runsPerWeekSelect.value = savedPlan.runsPerWeek?.toString() || "";
   raceDateInput.value = savedPlan.raceDate || "";
 
-  // Restore wellness into in-memory store (so dropdowns restore)
-  for (const key of Object.keys(wellnessStore)) {
-    delete wellnessStore[key];
-  }
   Object.assign(wellnessStore, savedPlan.wellnessStore || {});
 
-  // Render saved plan (no randomness)
-  renderPlan({
-    distance: savedPlan.distance,
-    raceDate: savedPlan.raceDate,
-    weeksToGenerate: savedPlan.weeksToGenerate,
-    selectedRunIdsByWeek: savedPlan.selectedRunIdsByWeek || [],
-  });
+  renderPlan(savedPlan);
 }
