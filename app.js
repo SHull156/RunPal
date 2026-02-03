@@ -5,6 +5,35 @@ const raceDateInput = document.getElementById("race-date");
 const planOutput = document.getElementById("plan-output");
 const resetButton = document.getElementById("reset-button");
 
+const PLAN_STORAGE_KEY = "runpal.plan.v1";
+
+const savePlanToLocalStorage = (planData) => {
+  localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(planData));
+};
+
+const loadPlanFromLocalStorage = () => {
+  const raw = localStorage.getItem(PLAN_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const updateSavedWellnessStore = (nextWellnessStore) => {
+  const savedPlan = loadPlanFromLocalStorage();
+  if (!savedPlan) return; // no saved plan yet so nothing to update
+
+  const updatedPlan = {
+    ...savedPlan,
+    wellnessStore: { ...nextWellnessStore },
+  };
+
+  savePlanToLocalStorage(updatedPlan);
+};
+
 const baseRuns = [
   { id: 1, runType: "Easy run", distanceKm: 5, bucket: "recovery" },
   { id: 2, runType: "Easy run", distanceKm: 6, bucket: "recovery" },
@@ -60,73 +89,9 @@ const selectRunsForWeek = (runs, runsPerWeekNum) => {
   return pickRandomUnique(selected, selected.length);
 };
 
-// Optional but useful reset (small + commit-friendly)
-resetButton.addEventListener("click", () => {
-  // Clear UI
-  planOutput.textContent = "";
-
-  // Reset form inputs
-  form.reset();
-
-  // Clear wellness store
-  for (const key of Object.keys(wellnessStore)) {
-    delete wellnessStore[key];
-  }
-});
-
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-
-  const distance = distanceSelect.value;
-  const runsPerWeek = runsPerWeekSelect.value;
-  const raceDate = raceDateInput.value;
-
-  let missingInputs = [];
-
-  // Build missing inputs list
-  if (distance === "") missingInputs.push("distance");
-  if (runsPerWeek === "") missingInputs.push("runs per week");
-  if (!raceDate) missingInputs.push("race date");
-
-  // If anything missing, show message and stop
-  if (missingInputs.length > 0) {
-    let message;
-
-    if (missingInputs.length === 1) {
-      message = missingInputs[0];
-    } else if (missingInputs.length === 2) {
-      message = missingInputs.join(" and ");
-    } else {
-      message =
-        missingInputs.slice(0, -1).join(", ") +
-        " and " +
-        missingInputs[missingInputs.length - 1];
-    }
-
-    planOutput.textContent = `Please choose ${message}.`;
-    return;
-  }
-
+const renderPlan = ({ distance, raceDate, weeksToGenerate, selectedRunIdsByWeek }) => {
   // Clear previous output
   planOutput.textContent = "";
-
-  // Convert runs per week to number
-  const runsPerWeekNum = Number(runsPerWeekSelect.value);
-
-  // Work out difference between current and race date
-  const today = new Date();
-  const race = new Date(raceDate);
-
-  const msUntilRace = race - today;
-  const daysUntilRace = msUntilRace / (1000 * 60 * 60 * 24);
-  const weeksToRace = Math.ceil(daysUntilRace / 7);
-
-  if (weeksToRace <= 0) {
-    planOutput.textContent = "Race date must be in the future.";
-    return;
-  }
-
-  const weeksToGenerate = Math.min(weeksToRace, 10);
 
   // Header
   const outputHeader = document.createElement("h2");
@@ -145,8 +110,10 @@ form.addEventListener("submit", (event) => {
     runPlanContainer.classList.add("run-list");
     planOutput.appendChild(runPlanContainer);
 
-    // Bucket-based selection
-    const runsForThisWeek = selectRunsForWeek(baseRuns, runsPerWeekNum);
+    const runIdsForThisWeek = selectedRunIdsByWeek[weekNumber - 1] || [];
+    const runsForThisWeek = runIdsForThisWeek
+      .map((id) => baseRuns.find((r) => r.id === id))
+      .filter(Boolean);
 
     // Render runs
     for (const run of runsForThisWeek) {
@@ -188,7 +155,7 @@ form.addEventListener("submit", (event) => {
 
       const runKey = `${weekNumber}-${run.id}`;
 
-      // Restore saved value
+      // Restore saved value (from in-memory store)
       const savedFeeling = wellnessStore[runKey];
       feelingTodaySelector.value = savedFeeling ? savedFeeling : "";
 
@@ -200,7 +167,7 @@ form.addEventListener("submit", (event) => {
         runContainer.appendChild(adjustedLabel);
       }
 
-      // Store on change
+      // Store on change (in-memory + persist)
       feelingTodaySelector.addEventListener("change", () => {
         const selectedFeeling = feelingTodaySelector.value;
 
@@ -209,7 +176,137 @@ form.addEventListener("submit", (event) => {
         } else {
           wellnessStore[runKey] = selectedFeeling;
         }
+
+        updateSavedWellnessStore(wellnessStore);
       });
     }
   }
+};
+
+// Reset Plan (UI + in-memory, and clears saved plan so refresh stays reset)
+resetButton.addEventListener("click", () => {
+  // Clear UI
+  planOutput.textContent = "";
+
+  // Reset form inputs
+  form.reset();
+
+  // Clear wellness store
+  for (const key of Object.keys(wellnessStore)) {
+    delete wellnessStore[key];
+  }
+
+  // Clear saved plan
+  localStorage.removeItem(PLAN_STORAGE_KEY);
 });
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const distance = distanceSelect.value;
+  const runsPerWeek = runsPerWeekSelect.value;
+  const raceDate = raceDateInput.value;
+
+  let missingInputs = [];
+
+  // Build missing inputs list
+  if (distance === "") missingInputs.push("distance");
+  if (runsPerWeek === "") missingInputs.push("runs per week");
+  if (!raceDate) missingInputs.push("race date");
+
+  // If anything missing, show message and stop
+  if (missingInputs.length > 0) {
+    let message;
+
+    if (missingInputs.length === 1) {
+      message = missingInputs[0];
+    } else if (missingInputs.length === 2) {
+      message = missingInputs.join(" and ");
+    } else {
+      message =
+        missingInputs.slice(0, -1).join(", ") +
+        " and " +
+        missingInputs[missingInputs.length - 1];
+    }
+
+    planOutput.textContent = `Please choose ${message}.`;
+    return;
+  }
+
+  // Convert runs per week to number
+  const runsPerWeekNum = Number(runsPerWeekSelect.value);
+
+  // Work out difference between current and race date
+  const today = new Date();
+  const race = new Date(raceDate);
+
+  const msUntilRace = race - today;
+  const daysUntilRace = msUntilRace / (1000 * 60 * 60 * 24);
+  const weeksToRace = Math.ceil(daysUntilRace / 7);
+
+  if (weeksToRace <= 0) {
+    planOutput.textContent = "Race date must be in the future.";
+    return;
+  }
+
+  const weeksToGenerate = Math.min(weeksToRace, 10);
+
+  // Generate selections (data) first
+  const selectedRunIdsByWeek = [];
+
+  for (let weekNumber = 1; weekNumber <= weeksToGenerate; weekNumber++) {
+    const runsForThisWeek = selectRunsForWeek(baseRuns, runsPerWeekNum);
+    selectedRunIdsByWeek.push(runsForThisWeek.map((run) => run.id));
+  }
+
+  // New plan = new slate for wellness
+  for (const key of Object.keys(wellnessStore)) {
+    delete wellnessStore[key];
+  }
+
+  // Render from data
+  renderPlan({
+    distance,
+    raceDate,
+    weeksToGenerate,
+    selectedRunIdsByWeek,
+  });
+
+  // Save snapshot
+  const planData = {
+    version: 1,
+    distance,
+    runsPerWeek: runsPerWeekNum,
+    raceDate,
+    weeksToGenerate,
+    selectedRunIdsByWeek,
+    wellnessStore: { ...wellnessStore },
+  };
+
+  savePlanToLocalStorage(planData);
+});
+
+// Restore on page load
+const savedPlan = loadPlanFromLocalStorage();
+
+if (savedPlan) {
+  // Restore form inputs
+  distanceSelect.value = savedPlan.distance || "";
+  runsPerWeekSelect.value =
+    typeof savedPlan.runsPerWeek === "number" ? String(savedPlan.runsPerWeek) : "";
+  raceDateInput.value = savedPlan.raceDate || "";
+
+  // Restore wellness into in-memory store (so dropdowns restore)
+  for (const key of Object.keys(wellnessStore)) {
+    delete wellnessStore[key];
+  }
+  Object.assign(wellnessStore, savedPlan.wellnessStore || {});
+
+  // Render saved plan (no randomness)
+  renderPlan({
+    distance: savedPlan.distance,
+    raceDate: savedPlan.raceDate,
+    weeksToGenerate: savedPlan.weeksToGenerate,
+    selectedRunIdsByWeek: savedPlan.selectedRunIdsByWeek || [],
+  });
+}
