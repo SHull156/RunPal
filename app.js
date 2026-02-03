@@ -4,6 +4,10 @@ const runsPerWeekSelect = document.getElementById("runs-per-week");
 const raceDateInput = document.getElementById("race-date");
 const planOutput = document.getElementById("plan-output");
 const resetButton = document.getElementById("reset-button");
+const PLAN_STORAGE_KEY = "runpal.plan.v1";
+const savePlanToLocalStorage = (planData) => {
+  localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(planData));
+}
 
 const baseRuns = [
   { id: 1, runType: "Easy run", distanceKm: 5, bucket: "recovery" },
@@ -127,6 +131,7 @@ form.addEventListener("submit", (event) => {
   }
 
   const weeksToGenerate = Math.min(weeksToRace, 10);
+  const selectedRunIdsByWeek = [];
 
   // Header
   const outputHeader = document.createElement("h2");
@@ -147,6 +152,7 @@ form.addEventListener("submit", (event) => {
 
     // Bucket-based selection
     const runsForThisWeek = selectRunsForWeek(baseRuns, runsPerWeekNum);
+    selectedRunIdsByWeek.push(runsForThisWeek.map((run) => run.id));
 
     // Render runs
     for (const run of runsForThisWeek) {
@@ -212,4 +218,17 @@ form.addEventListener("submit", (event) => {
       });
     }
   }
+const planData = {
+  version: 1,
+  distance,
+  runsPerWeek: runsPerWeekNum,
+  raceDate,
+  weeksToGenerate,
+  selectedRunIdsByWeek,
+  wellnessStore: { ...wellnessStore },
+};
+
+savePlanToLocalStorage(planData);
+
+
 });
