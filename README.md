@@ -73,7 +73,7 @@ That’s it — no build step required.
 
 ---
 
-## Roadmap (intentional and limited)
+## Roadmap
 
 - Progressive long-run distance across weeks
 - Minor UI copy and accessibility polish
